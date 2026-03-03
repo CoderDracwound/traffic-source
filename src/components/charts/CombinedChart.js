@@ -1,6 +1,5 @@
 import {
   ComposedChart,
-  Area,
   Bar,
   XAxis,
   YAxis,
@@ -80,22 +79,13 @@ export default function CombinedChart({ trafficData, revenueData }) {
               opacity={0.7}
             />
           )}
-          <Area
+          <Bar
             yAxisId="left"
-            type="monotone"
             dataKey="page_views"
-            stroke="#e8604c"
-            fill="url(#areaGradient)"
-            strokeWidth={2.5}
-            dot={false}
-            activeDot={{ r: 4, fill: '#e8604c', stroke: '#fff', strokeWidth: 2 }}
+            fill="#e8604c"
+            radius={[4, 4, 0, 0]}
+            barSize={20}
           />
-          <defs>
-            <linearGradient id="areaGradient" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#e8604c" stopOpacity={0.15} />
-              <stop offset="100%" stopColor="#e8604c" stopOpacity={0} />
-            </linearGradient>
-          </defs>
         </ComposedChart>
       </ResponsiveContainer>
     </div>

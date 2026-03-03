@@ -14,7 +14,32 @@ export default withAuth(function handler(req, res) {
       )
       .all(req.user.userId);
 
-    return res.status(200).json({ sites });
+    // Fetch hourly page views for last 24h per site
+    const siteIds = sites.map((s) => s.id);
+    const hourlyMap = {};
+    if (siteIds.length > 0) {
+      const rows = db
+        .prepare(
+          `SELECT site_id, strftime('%Y-%m-%d %H:00', timestamp) as hour, COUNT(*) as views
+           FROM page_views
+           WHERE site_id IN (${siteIds.map(() => '?').join(',')})
+             AND timestamp >= datetime('now', '-24 hours')
+           GROUP BY site_id, hour
+           ORDER BY hour`
+        )
+        .all(...siteIds);
+      for (const row of rows) {
+        if (!hourlyMap[row.site_id]) hourlyMap[row.site_id] = [];
+        hourlyMap[row.site_id].push({ hour: row.hour, views: row.views });
+      }
+    }
+
+    const enriched = sites.map((s) => ({
+      ...s,
+      hourly: hourlyMap[s.id] || [],
+    }));
+
+    return res.status(200).json({ sites: enriched });
   }
 
   if (req.method === 'POST') {

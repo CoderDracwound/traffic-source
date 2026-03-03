@@ -1,26 +1,21 @@
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/router';
-import { countryCodeToFlag, getBrowserIcon, getDeviceIcon } from '@/lib/formatters';
+import { countryCodeToFlag } from '@/lib/formatters';
 
-const AVATAR_EMOJIS = [
-  '\u{1F60A}', '\u{1F60E}', '\u{1F913}', '\u{1F60D}', '\u{1F914}',
-  '\u{1F929}', '\u{1F970}', '\u{1F642}', '\u{1F609}', '\u{1F60B}',
-  '\u{1F917}', '\u{1F604}', '\u{1F973}', '\u{1F978}', '\u{1F920}',
-  '\u{1FAE1}', '\u{1FAE0}', '\u{1FAE3}', '\u{1F60F}', '\u{1F636}',
-];
-
-function getAvatarEmoji(visitorId) {
-  let hash = 0;
-  for (let i = 0; i < visitorId.length; i++) {
-    hash = ((hash << 5) - hash) + visitorId.charCodeAt(i);
-    hash |= 0;
+function groupByCountry(users) {
+  const map = {};
+  for (const user of users) {
+    const code = user.country ? user.country.toUpperCase() : 'UNKNOWN';
+    if (!map[code]) map[code] = [];
+    map[code].push(user);
   }
-  return AVATAR_EMOJIS[Math.abs(hash) % AVATAR_EMOJIS.length];
+  return Object.entries(map)
+    .map(([code, visitors]) => ({ code, visitors, count: visitors.length }))
+    .sort((a, b) => b.count - a.count);
 }
 
 export default function RealtimeUsers() {
   const [data, setData] = useState(null);
-  const [hoveredUser, setHoveredUser] = useState(null);
   const router = useRouter();
   const { siteId } = router.query;
   const intervalRef = useRef(null);
@@ -60,36 +55,15 @@ export default function RealtimeUsers() {
       </div>
 
       {data.users.length > 0 && (
-        <div className="realtime-avatars">
-          {data.users.slice(0, 20).map((user) => (
-            <div
-              key={user.visitor_id}
-              className="realtime-avatar"
-              onMouseEnter={() => setHoveredUser(user)}
-              onMouseLeave={() => setHoveredUser(null)}
-            >
-              {getAvatarEmoji(user.visitor_id)}
-
-              {hoveredUser?.visitor_id === user.visitor_id && (
-                <div className="realtime-tooltip">
-                  <div className="realtime-tooltip-row">
-                    {user.country ? `${countryCodeToFlag(user.country.toUpperCase())} ${user.country}` : 'Unknown location'}
-                  </div>
-                  <div className="realtime-tooltip-row">
-                    {getBrowserIcon(user.browser)} {user.browser || 'Unknown browser'}
-                  </div>
-                  <div className="realtime-tooltip-row">
-                    {getDeviceIcon(user.device_type)} {user.current_page || '/'}
-                  </div>
-                </div>
-              )}
+        <div className="realtime-flags">
+          {groupByCountry(data.users).map(({ code, count }) => (
+            <div key={code} className="realtime-flag">
+              <span className="realtime-flag-emoji">
+                {code !== 'UNKNOWN' ? countryCodeToFlag(code) : '\u{1F310}'}
+              </span>
+              {count > 1 && <span className="realtime-flag-count">{count}</span>}
             </div>
           ))}
-          {data.users.length > 20 && (
-            <div className="realtime-avatar realtime-more">
-              +{data.users.length - 20}
-            </div>
-          )}
         </div>
       )}
     </div>

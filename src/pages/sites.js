@@ -148,19 +148,39 @@ export default function Sites() {
             </button>
           </div>
         ) : (
-          <div className="sites-grid">
-            {sites.map((site) => (
-              <div
-                key={site.id}
-                className="site-card"
-                onClick={() => router.push(`/analytics/${site.id}`)}
-              >
-                <div className="site-card-header">
-                  <div>
-                    <div className="site-card-name">{site.name}</div>
-                    <div className="site-card-domain">{site.domain}</div>
+          <div className="sites-list">
+            {sites.map((site) => {
+              const total24h = site.hourly.reduce((sum, h) => sum + h.views, 0);
+              const maxViews = Math.max(...site.hourly.map((h) => h.views), 1);
+              return (
+                <div
+                  key={site.id}
+                  className="site-row"
+                  onClick={() => router.push(`/analytics/${site.id}`)}
+                >
+                  <div className="site-row-info">
+                    <div className="site-row-name">{site.name}</div>
+                    <div className="site-row-domain">{site.domain}</div>
                   </div>
-                  <div style={{ display: 'flex', gap: 4 }}>
+                  <div className="site-row-chart">
+                    {site.hourly.length > 0 ? (
+                      site.hourly.map((h, i) => (
+                        <div
+                          key={i}
+                          className="site-row-bar"
+                          style={{ height: `${(h.views / maxViews) * 100}%` }}
+                          title={`${h.hour}: ${h.views} views`}
+                        />
+                      ))
+                    ) : (
+                      <span className="site-row-nodata">No data</span>
+                    )}
+                  </div>
+                  <div className="site-row-stats">
+                    <span className="site-row-count">{total24h}</span>
+                    <span className="site-row-period">last 24h</span>
+                  </div>
+                  <div className="site-row-actions">
                     <button
                       className="btn btn-secondary btn-sm"
                       onClick={(e) => {
@@ -184,11 +204,8 @@ export default function Sites() {
                     </button>
                   </div>
                 </div>
-                <div className="site-card-stats">
-                  {site.views_7d || 0} views (last 7 days)
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
 
