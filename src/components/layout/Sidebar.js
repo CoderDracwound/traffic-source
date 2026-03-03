@@ -23,9 +23,15 @@ export default function Sidebar({ siteId }) {
             <div className="sidebar-section">Current Site</div>
             <Link
               href={`/analytics/${siteId}`}
-              className={`sidebar-link ${path.startsWith(`/analytics/${siteId}`) ? 'active' : ''}`}
+              className={`sidebar-link ${path === `/analytics/${siteId}` ? 'active' : ''}`}
             >
               Analytics
+            </Link>
+            <Link
+              href={`/analytics/${siteId}/settings`}
+              className={`sidebar-link ${path === `/analytics/${siteId}/settings` ? 'active' : ''}`}
+            >
+              Site Settings
             </Link>
           </>
         )}
