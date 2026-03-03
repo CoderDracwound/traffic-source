@@ -1,11 +1,11 @@
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/router';
-import { getCountryName, getBrowserIcon, getDeviceIcon } from '@/lib/formatters';
+import { getCountryName } from '@/lib/formatters';
 import CountryFlag from './CountryFlag';
-import VisitorAvatar from './VisitorAvatar';
 
 export default function RealtimeUsers() {
   const [data, setData] = useState(null);
+  const [expanded, setExpanded] = useState(false);
   const router = useRouter();
   const { siteId } = router.query;
   const intervalRef = useRef(null);
@@ -35,55 +35,32 @@ export default function RealtimeUsers() {
   if (!data) return null;
 
   return (
-    <div className="realtime-panel">
-      <div className="realtime-header">
+    <div className="realtime-widget">
+      <button className="realtime-widget-toggle" onClick={() => setExpanded(!expanded)}>
         <span className="realtime-dot" />
-        <span className="realtime-count">{data.count}</span>
-        <span className="realtime-label">
+        <span className="realtime-widget-count">{data.count}</span>
+        <span className="realtime-widget-label">
           {data.count === 1 ? 'visitor' : 'visitors'} online
         </span>
-      </div>
+        <span className={`realtime-widget-chevron ${expanded ? 'open' : ''}`}>&#x25B2;</span>
+      </button>
 
-      {data.users.length > 0 && (
-        <table className="realtime-table">
-          <thead>
-            <tr>
-              <th>Visitor</th>
-              <th>Country</th>
-              <th>Browser</th>
-              <th>Device</th>
-              <th>Page</th>
-            </tr>
-          </thead>
-          <tbody>
-            {data.users.slice(0, 20).map((user) => (
-              <tr key={user.visitor_id}>
-                <td>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <VisitorAvatar visitorId={user.visitor_id} size={32} />
-                    <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
-                      {user.visitor_id.slice(0, 8)}...
-                    </span>
-                  </div>
-                </td>
-                <td>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <CountryFlag code={user.country} size="s" />
-                    <span>{user.country ? getCountryName(user.country) : 'Unknown'}</span>
-                  </div>
-                </td>
-                <td>{getBrowserIcon(user.browser)} {user.browser || 'Unknown'}</td>
-                <td>{getDeviceIcon(user.device_type)} {user.device_type || 'Unknown'}</td>
-                <td style={{ color: 'var(--text-secondary)' }}>{user.current_page || '/'}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
-
-      {data.users.length > 20 && (
-        <div style={{ padding: '10px 16px', fontSize: 12, color: 'var(--text-muted)', textAlign: 'center', borderTop: '1px solid var(--border-light)' }}>
-          +{data.users.length - 20} more visitors
+      {expanded && data.users.length > 0 && (
+        <div className="realtime-widget-list">
+          {data.users.slice(0, 10).map((user) => (
+            <div className="realtime-widget-row" key={user.visitor_id}>
+              <CountryFlag code={user.country} size="s" />
+              <span className="realtime-widget-country">
+                {user.country ? getCountryName(user.country) : 'Unknown'}
+              </span>
+              <span className="realtime-widget-page">{user.current_page || '/'}</span>
+            </div>
+          ))}
+          {data.users.length > 10 && (
+            <div className="realtime-widget-more">
+              +{data.users.length - 10} more
+            </div>
+          )}
         </div>
       )}
     </div>

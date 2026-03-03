@@ -33,7 +33,7 @@ export default function Settings() {
                 <button className="panel-tab active">Profile</button>
               </div>
             </div>
-            <div className="panel-body">
+            <div className="panel-body" style={{ padding: 20 }}>
               <form onSubmit={handleUpdateProfile} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                 {message && (
                   <div style={{ background: 'var(--success-light)', color: 'var(--success)', padding: '10px 14px', borderRadius: 'var(--radius)', fontSize: 13 }}>

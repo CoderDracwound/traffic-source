@@ -109,7 +109,7 @@ export default function SiteSettings() {
               <button className="panel-tab active">Tracking Code</button>
             </div>
           </div>
-          <div className="panel-body">
+          <div className="panel-body" style={{ padding: 20 }}>
             {snippetData ? (
               <>
                 <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 12 }}>
@@ -163,7 +163,7 @@ export default function SiteSettings() {
               <button className="panel-tab active">Stripe</button>
             </div>
           </div>
-          <div className="panel-body">
+          <div className="panel-body" style={{ padding: 20 }}>
             {stripeMessage && (
               <div style={{ background: 'var(--success-light)', color: 'var(--success)', padding: '10px 14px', borderRadius: 'var(--radius)', fontSize: 13, marginBottom: 12 }}>
                 {stripeMessage}
@@ -173,7 +173,7 @@ export default function SiteSettings() {
             <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 16 }}>
               Enter your Stripe API keys for this site. You can find these in your Stripe Dashboard under Developers &gt; API keys.
             </p>
-            <form onSubmit={handleSaveStripe}>
+            <form onSubmit={handleSaveStripe} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
               <div className="form-group">
                 <label>Stripe Secret Key</label>
                 <input
@@ -192,10 +192,10 @@ export default function SiteSettings() {
                   placeholder="whsec_..."
                 />
               </div>
-              <p style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 8, marginBottom: 16 }}>
+              <p style={{ fontSize: 12, color: 'var(--text-muted)' }}>
                 Listen for <code>checkout.session.completed</code> and <code>charge.refunded</code> events.
               </p>
-              <button type="submit" className="btn btn-primary" disabled={stripeSaving}>
+              <button type="submit" className="btn btn-primary" disabled={stripeSaving} style={{ alignSelf: 'flex-start' }}>
                 {stripeSaving ? 'Saving...' : 'Save Keys'}
               </button>
             </form>
@@ -209,7 +209,7 @@ export default function SiteSettings() {
               <button className="panel-tab active" style={{ color: 'var(--danger, #e53e3e)' }}>Danger Zone</button>
             </div>
           </div>
-          <div className="panel-body">
+          <div className="panel-body" style={{ padding: 20 }}>
             <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 16 }}>
               Permanently delete <strong>{site.name}</strong> and all its analytics data. This action cannot be undone.
             </p>
