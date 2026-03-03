@@ -91,6 +91,7 @@ export default function Conversions() {
             ) : (
               <ConversionJourneyTable
                 conversions={data?.conversions || []}
+                siteId={siteId}
               />
             )}
           </div>

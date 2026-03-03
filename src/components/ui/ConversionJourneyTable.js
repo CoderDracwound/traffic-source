@@ -1,6 +1,9 @@
-import { getCountryName, getBrowserIcon, getOsIcon, getDeviceIcon } from '@/lib/formatters';
+import { useState, useEffect } from 'react';
+import { getCountryName, getDeviceIcon } from '@/lib/formatters';
 import CountryFlag from './CountryFlag';
+import TechIcon from './TechIcon';
 import VisitorAvatar from './VisitorAvatar';
+import ConversionDrawer from './ConversionDrawer';
 
 const JOURNEY_COLORS = [
   '#7c5bf5', '#4c9fe8', '#22c55e', '#f5875b', '#8b5cf6',
@@ -60,7 +63,9 @@ function maskName(email) {
   return local.slice(0, 3) + '** ******';
 }
 
-export default function ConversionJourneyTable({ conversions }) {
+export default function ConversionJourneyTable({ conversions, siteId }) {
+  const [selectedConversion, setSelectedConversion] = useState(null);
+
   if (!conversions || conversions.length === 0) {
     return (
       <div className="empty-state">
@@ -75,6 +80,8 @@ export default function ConversionJourneyTable({ conversions }) {
         <thead>
           <tr>
             <th>Visitor</th>
+            <th>Country</th>
+            <th>Browser</th>
             <th>Source</th>
             <th>Spent</th>
             <th>Time to complete</th>
@@ -89,7 +96,7 @@ export default function ConversionJourneyTable({ conversions }) {
             const displayName = maskName(conv.stripe_customer_email) || `Visitor ${(conv.visitor_id || '').slice(-6)}`;
 
             return (
-              <tr key={conv.id}>
+              <tr key={conv.id} onClick={() => setSelectedConversion(conv)}>
                 <td>
                   <div className="visitor-cell">
                     <VisitorAvatar visitorId={conv.visitor_id} size={44} />
@@ -98,24 +105,38 @@ export default function ConversionJourneyTable({ conversions }) {
                         {displayName}
                         <span className="badge-customer">Customer</span>
                       </div>
-                      <div className="visitor-meta">
-                        {conv.country && (
-                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                            <CountryFlag code={conv.country} size="s" />
-                            {getCountryName(conv.country)}
-                          </span>
-                        )}
-                        {conv.device_type && (
+                      {conv.device_type && (
+                        <div className="visitor-meta">
                           <span>{getDeviceIcon(conv.device_type)} {conv.device_type}</span>
-                        )}
-                        {conv.os && (
-                          <span>{getOsIcon(conv.os)} {conv.os}</span>
-                        )}
-                        {conv.browser && (
-                          <span>{getBrowserIcon(conv.browser)} {conv.browser}</span>
-                        )}
-                      </div>
+                        </div>
+                      )}
                     </div>
+                  </div>
+                </td>
+
+                <td>
+                  <div className="country-cell">
+                    {conv.country ? (
+                      <>
+                        <CountryFlag code={conv.country} size="s" />
+                        <span>{getCountryName(conv.country)}</span>
+                      </>
+                    ) : (
+                      <span style={{ color: 'var(--text-muted)' }}>--</span>
+                    )}
+                  </div>
+                </td>
+
+                <td>
+                  <div className="browser-cell">
+                    {conv.browser ? (
+                      <>
+                        <TechIcon type="browser" name={conv.browser} />
+                        <span>{conv.browser}</span>
+                      </>
+                    ) : (
+                      <span style={{ color: 'var(--text-muted)' }}>--</span>
+                    )}
                   </div>
                 </td>
 
@@ -162,6 +183,12 @@ export default function ConversionJourneyTable({ conversions }) {
           })}
         </tbody>
       </table>
+
+      <ConversionDrawer
+        siteId={siteId}
+        conversion={selectedConversion}
+        onClose={() => setSelectedConversion(null)}
+      />
     </div>
   );
 }
