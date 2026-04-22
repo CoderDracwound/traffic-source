@@ -5,6 +5,7 @@ import {
   LuSearch, LuTrendingUp, LuTrendingDown, LuTarget, LuLightbulb, LuSparkles, LuSkull,
   LuMousePointerClick, LuEye, LuPercent, LuArrowUpRight, LuArrowDownRight, LuExternalLink, LuUnlink,
   LuGlobe, LuMonitor, LuSmartphone, LuTablet, LuChevronRight,
+  LuDownload, LuCopy, LuCheck, LuLoader,
 } from 'react-icons/lu';
 import { getCountryName } from '@/lib/formatters';
 import CountryFlag from '@/components/ui/CountryFlag';
@@ -17,6 +18,7 @@ export default function GscPage() {
   const { period } = useDateRange();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(1);
   const [propsLoading, setPropsLoading] = useState(false);
   const [properties, setProperties] = useState(null);
   const [propSiteDomain, setPropSiteDomain] = useState('');
@@ -27,10 +29,10 @@ export default function GscPage() {
   const load = useCallback(async () => {
     if (!siteId) return;
     setLoading(true);
-    const r = await fetch(`/api/sites/${siteId}/gsc/data?period=${period}`);
+    const r = await fetch(`/api/sites/${siteId}/gsc/data?period=${period}&page=${page}&limit=30`);
     if (r.ok) setData(await r.json());
     setLoading(false);
-  }, [siteId, period]);
+  }, [siteId, period, page]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -99,7 +101,7 @@ export default function GscPage() {
           />
         )}
 
-        {data.googleConnected && data.linked && <Dashboard data={data} onUnlink={unlink} />}
+        {data.googleConnected && data.linked && <Dashboard data={data} onUnlink={unlink} page={page} setPage={setPage} />}
       </DashboardLayout>
     </>
   );
@@ -156,7 +158,7 @@ function PropertyPicker({ properties, selectedProp, setSelectedProp, onLink, lin
 // Dashboard
 // ─────────────────────────────────────────────────────────────────
 
-function Dashboard({ data, onUnlink }) {
+function Dashboard({ data, onUnlink, page, setPage }) {
   const t = data.totals || {};
   const clicks = t.clicks || 0;
   const clicksPrev = t.clicks_prev || 0;
@@ -166,6 +168,64 @@ function Dashboard({ data, onUnlink }) {
   const avgPosPrev = t.avg_position_prev || 0;
   const avgCtr = t.avg_ctr || 0;
   const avgCtrPrev = t.avg_ctr_prev || 0;
+
+  const [selectedKeywords, setSelectedKeywords] = useState(new Set());
+  const [exporting, setExporting] = useState(false);
+
+  // Reset selection when data (page) changes
+  useEffect(() => {
+    setSelectedKeywords(new Set());
+  }, [data.topQueries]);
+
+  const toggleSelect = (query) => {
+    const next = new Set(selectedKeywords);
+    if (next.has(query)) next.delete(query);
+    else next.add(query);
+    setSelectedKeywords(next);
+  };
+
+  const selectAll = () => {
+    if (selectedKeywords.size === (data.topQueries || []).length && selectedKeywords.size > 0) {
+      setSelectedKeywords(new Set());
+    } else {
+      setSelectedKeywords(new Set(data.topQueries.map((r) => r.query)));
+    }
+  };
+
+  const handleExport = async () => {
+    if (selectedKeywords.size === 0) return;
+    setExporting(true);
+    const results = {};
+    
+    // Fetch details for each selected keyword sequentially
+    for (const query of selectedKeywords) {
+      try {
+        const r = await fetch(`/api/sites/${data.site.id}/gsc/keyword?query=${encodeURIComponent(query)}&period=${data.period}`);
+        const json = r.ok ? await r.json() : null;
+        if (json) {
+          results[query] = {
+            query: json.query,
+            stats: (data.topQueries || []).find(q => q.query === query),
+            pages: json.pages,
+            countries: json.countries,
+            devices: json.devices
+          };
+        }
+      } catch (err) {
+        console.error(`Export error for ${query}:`, err);
+      }
+    }
+
+    const blob = new Blob([JSON.stringify(results, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const date = new Date().toISOString().split('T')[0];
+    a.href = url;
+    a.download = `gsc-export-${data.site.domain.replace(/\./g, '-')}-${date}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    setExporting(false);
+  };
 
   return (
     <>
@@ -202,7 +262,20 @@ function Dashboard({ data, onUnlink }) {
 
 
       {/* Keyword-centric drill-down */}
-      <KeywordExplorer siteId={data.site.id} period={data.period} days={data.days} rows={data.topQueries} />
+      <KeywordExplorer 
+        siteId={data.site.id} 
+        period={data.period} 
+        days={data.days} 
+        rows={data.topQueries} 
+        selectedKeywords={selectedKeywords}
+        toggleSelect={toggleSelect}
+        selectAll={selectAll}
+        exporting={exporting}
+        onExport={handleExport}
+        page={page}
+        setPage={setPage}
+        total={data.totalQueries}
+      />
 
       {/* Insights */}
       <InsightsPanel data={data} />
@@ -426,7 +499,7 @@ function insightCols(variant) {
 // (click a keyword to see pages, countries, devices for that exact query)
 // ─────────────────────────────────────────────────────────────────
 
-function KeywordExplorer({ siteId, period, days, rows }) {
+function KeywordExplorer({ siteId, period, days, rows, selectedKeywords, toggleSelect, selectAll, exporting, onExport, page, setPage, total }) {
   const [expanded, setExpanded] = useState(null);
   const [details, setDetails] = useState({}); // { [query]: { loading, data, error } }
 
@@ -445,65 +518,133 @@ function KeywordExplorer({ siteId, period, days, rows }) {
     }
   };
 
+  const totalPages = Math.ceil((total || 0) / 30);
+  const allSelected = (rows || []).length > 0 && selectedKeywords.size === (rows || []).length;
+
   return (
     <div className="panel" style={{ padding: 0, marginBottom: 20 }}>
-      <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--border)' }}>
-        <div style={{ fontWeight: 600, fontSize: 14 }}>Keyword explorer</div>
-        <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
-          Click any keyword to see which pages it ranks for, where searchers are, and what devices they use — last {days} days
+      <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div>
+          <div style={{ fontWeight: 600, fontSize: 14 }}>Keyword explorer</div>
+          <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
+            Click any keyword to see details — last {days} days
+          </div>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          {selectedKeywords.size > 0 && (
+            <div style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 500 }}>
+              {selectedKeywords.size} selected
+            </div>
+          )}
+          <button 
+            className="btn btn-secondary btn-sm" 
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
+            disabled={selectedKeywords.size === 0 || exporting}
+            onClick={onExport}
+          >
+            {exporting ? <LuLoader size={14} className="loading-spinner" /> : <LuDownload size={14} />}
+            {exporting ? 'Exporting...' : 'Export JSON'}
+          </button>
         </div>
       </div>
 
       {(!rows || rows.length === 0) ? (
         <div style={{ padding: 32, textAlign: 'center', color: 'var(--text-muted)', fontSize: 13 }}>No keywords yet</div>
       ) : (
-        <table className="journey-table" style={{ width: '100%' }}>
-          <thead>
-            <tr>
-              <th style={{ width: 28 }}></th>
-              <th style={{ textAlign: 'left' }}>Keyword</th>
-              <th style={{ textAlign: 'right' }}>Clicks</th>
-              <th style={{ textAlign: 'right' }}>Impr.</th>
-              <th style={{ textAlign: 'right' }}>CTR</th>
-              <th style={{ textAlign: 'right' }}>Pos.</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((r, i) => {
-              const isOpen = expanded === r.query;
-              const det = details[r.query];
-              return (
-                <FragmentRow key={i}>
-                  <tr
-                    onClick={() => toggle(r.query)}
-                    style={{ cursor: 'pointer', background: isOpen ? 'var(--bg)' : undefined }}
-                  >
-                    <td style={{ paddingLeft: 12 }}>
-                      <LuChevronRight
-                        size={14}
-                        style={{ transition: 'transform 0.15s', transform: isOpen ? 'rotate(90deg)' : 'none', color: 'var(--text-muted)' }}
-                      />
-                    </td>
-                    <td style={{ textAlign: 'left', maxWidth: 360, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 13, fontWeight: isOpen ? 600 : 500 }} title={r.query}>
-                      {r.query}
-                    </td>
-                    <td style={{ textAlign: 'right', fontSize: 13 }}>{fmtNum(r.clicks)}</td>
-                    <td style={{ textAlign: 'right', fontSize: 13 }}>{fmtNum(r.impressions)}</td>
-                    <td style={{ textAlign: 'right', fontSize: 13 }}>{(r.ctr * 100).toFixed(1)}%</td>
-                    <td style={{ textAlign: 'right', fontSize: 13 }}>{r.position.toFixed(1)}</td>
-                  </tr>
-                  {isOpen && (
-                    <tr>
-                      <td colSpan={6} style={{ padding: 0, background: 'var(--bg)', borderTop: '1px solid var(--border)', borderBottom: '1px solid var(--border)' }}>
-                        <KeywordDetails det={det} />
-                      </td>
-                    </tr>
-                  )}
-                </FragmentRow>
-              );
-            })}
-          </tbody>
-        </table>
+        <>
+          <div style={{ overflow: 'auto' }}>
+            <table className="journey-table" style={{ width: '100%' }}>
+              <thead>
+                <tr>
+                  <th style={{ width: 40, textAlign: 'center' }}>
+                    <input 
+                      type="checkbox" 
+                      checked={allSelected} 
+                      onChange={selectAll} 
+                      style={{ cursor: 'pointer' }}
+                    />
+                  </th>
+                  <th style={{ width: 40 }}></th>
+                  <th style={{ textAlign: 'left' }}>Keyword</th>
+                  <th style={{ textAlign: 'right' }}>Clicks</th>
+                  <th style={{ textAlign: 'right' }}>Impr.</th>
+                  <th style={{ textAlign: 'right' }}>CTR</th>
+                  <th style={{ textAlign: 'right' }}>Pos.</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((r, i) => {
+                  const isOpen = expanded === r.query;
+                  const isSelected = selectedKeywords.has(r.query);
+                  const det = details[r.query];
+                  return (
+                    <FragmentRow key={i}>
+                      <tr
+                        onClick={() => toggle(r.query)}
+                        style={{ cursor: 'pointer', background: isOpen ? 'var(--bg)' : undefined }}
+                      >
+                        <td 
+                          style={{ textAlign: 'center', verticalAlign: 'middle' }}
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <input 
+                            type="checkbox" 
+                            checked={isSelected} 
+                            onChange={() => toggleSelect(r.query)} 
+                            style={{ cursor: 'pointer' }}
+                          />
+                        </td>
+                        <td style={{ paddingLeft: 0 }}>
+                          <LuChevronRight
+                            size={14}
+                            style={{ transition: 'transform 0.15s', transform: isOpen ? 'rotate(90deg)' : 'none', color: 'var(--text-muted)' }}
+                          />
+                        </td>
+                        <td style={{ textAlign: 'left', maxWidth: 360, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 13, fontWeight: isOpen ? 600 : 500 }} title={r.query}>
+                          {r.query}
+                        </td>
+                        <td style={{ textAlign: 'right', fontSize: 13 }}>{fmtNum(r.clicks)}</td>
+                        <td style={{ textAlign: 'right', fontSize: 13 }}>{fmtNum(r.impressions)}</td>
+                        <td style={{ textAlign: 'right', fontSize: 13 }}>{(r.ctr * 100).toFixed(1)}%</td>
+                        <td style={{ textAlign: 'right', fontSize: 13 }}>{r.position.toFixed(1)}</td>
+                      </tr>
+                      {isOpen && (
+                        <tr>
+                          <td colSpan={7} style={{ padding: 0, background: 'var(--bg)', borderTop: '1px solid var(--border)', borderBottom: '1px solid var(--border)' }}>
+                            <KeywordDetails det={det} />
+                          </td>
+                        </tr>
+                      )}
+                    </FragmentRow>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 16, padding: '12px 16px', borderTop: '1px solid var(--border)' }}>
+              <button 
+                className="btn btn-secondary btn-sm" 
+                disabled={page <= 1}
+                onClick={() => { setPage(page - 1); setExpanded(null); }}
+              >
+                Previous
+              </button>
+              <div style={{ fontSize: 13, color: 'var(--text-muted)', fontWeight: 500 }}>
+                Page <span style={{ color: 'var(--text)' }}>{page}</span> of {totalPages}
+              </div>
+              <button 
+                className="btn btn-secondary btn-sm" 
+                disabled={page >= totalPages}
+                onClick={() => { setPage(page + 1); setExpanded(null); }}
+              >
+                Next
+              </button>
+            </div>
+          )}
+        </>
       )}
     </div>
   );

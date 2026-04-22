@@ -147,9 +147,15 @@ export default withAuth(function handler(req, res) {
     };
   });
 
-  const topQueries = [...enriched]
-    .sort((a, b) => (b.clicks_28d - a.clicks_28d) || (b.impressions_28d - a.impressions_28d))
-    .slice(0, 25)
+  const sortedKeywords = [...enriched]
+    .sort((a, b) => (b.clicks_28d - a.clicks_28d) || (b.impressions_28d - a.impressions_28d));
+
+  const page = parseInt(req.query.page) || 1;
+  const limit = parseInt(req.query.limit) || 25;
+  const offset = (page - 1) * limit;
+
+  const topQueries = sortedKeywords
+    .slice(offset, offset + limit)
     .map((r) => ({
       query: r.query,
       clicks: r.clicks_28d,
@@ -189,6 +195,9 @@ export default withAuth(function handler(req, res) {
     timeSeries,
     topPages,
     topQueries,
+    totalQueries: sortedKeywords.length,
+    page,
+    limit,
     topCountries,
     devices,
     winners,
